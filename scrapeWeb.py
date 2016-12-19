@@ -5,12 +5,14 @@ import re
 from threading import Thread
 import urllib
 from hurry.filesize import size
+from feedgen.feed import FeedGenerator
 
 domain = "https://www.kanald.com.tr"
 indexUrl = "/arka-sokaklar/bolumler?p=%d&orderby=StartDate%%20desc"
 
 indexLinkSelector = CSSSelector(".kd-docs-section a.title")
 metaContentSelector = CSSSelector("meta[itemprop='contentURL']")
+metaPublishDateSelector = CSSSelector("meta[itemprop='datePublished']")
 hasNextSelector = CSSSelector(".load-more-container.more-button")
 nameMatcher = re.compile(r'ArkaSokaklar([0-9]+)\.B\xf6l\xfcm.*', re.IGNORECASE | re.UNICODE)
 
@@ -31,6 +33,13 @@ def getEpisodes():
     for thread in threads:
         thread.join()
 
+    # Let's put the "last episode" in place (and not index -1)
+    maxEpisode = 0
+    for episode, data in episodes.iteritems():
+        maxEpisode = max(maxEpisode, episode)
+    episodes[maxEpisode + 1] = episodes.get(-1)
+    del episodes[-1]
+
     return episodes
 
 def getEpisodeNumberFromName(name):
@@ -41,20 +50,22 @@ def getEpisodeNumberFromName(name):
 def addEpisodeMediaLink(number, link, result):
     r = requests.get(link)
     tree = html.fromstring(r.content)
-    tag = metaContentSelector(tree)
+    linkTag = metaContentSelector(tree)
+    dateTag = metaPublishDateSelector(tree)
     try:
-        mediaLink = tag[0].get("content")
+        mediaLink = linkTag[0].get("content")
+        publishDate = dateTag[0].get("content")
 
-        d = urllib.urlopen(mediaLink)
-        fsize = int(d.info()['Content-Length'])
-        d.close()
+        #d = urllib.urlopen(mediaLink)
+        #fsize = int(d.info()['Content-Length'])
+        #d.close()
 
-        result[number] = (mediaLink, fsize)
+        result[number] = (mediaLink, publishDate)
     except:
-        print("No meta content tag for: %s at %s" % (number, link))
+        return
 
 def parseEpisodes(n, result, threads):
-    print("Reading page %d" % n)
+    #print("Reading page %d" % n)
     r = requests.get(domain + (indexUrl % n))
     tree = html.fromstring(r.content)
 
@@ -69,11 +80,11 @@ def parseEpisodes(n, result, threads):
             if name == u'ArkaSokaklarSonB\xf6l\xfcm':
                 number = -1
             else:
-                print("Missed episode: %s" % name)
+                #print("Missed episode: %s" % name)
                 continue
 
         if result.get(number) != None:
-            print("There is a duplicate episode: %d" % number)
+            #print("There is a duplicate episode: %d" % number)
             continue
 
         # Get media file episode
@@ -91,22 +102,26 @@ def parseEpisodes(n, result, threads):
 
 episodes = getEpisodes()
 
-# Let's put the "last episode" in place (and not index -1)
-maxEpisode = 0
-for episode, data in episodes.iteritems():
-    maxEpisode = max(maxEpisode, episode)
-episodes[maxEpisode + 1] = episodes.get(-1)
+fg = FeedGenerator()
+fg.title("Arka Sokaklar Bolumleri")
+fg.author({'name': 'Riperion Medya', 'email': 'riperion.inc@gmail.com'})
 
 totalSize = 0
 # This type of loop allows us to see missing episodes too
 for x in range(1, maxEpisode + 2):
     ep = episodes.get(x)
-    if ep is None:
-        print("%d: N/A" % x)
-    else:
+    #if ep is None:
+    #    print("%d: N/A" % x)
+    #else:
+    if ep is not None:
         link = ep[0]
-        fsize = ep[1]
-        print("%d: %s (size %s)" % (x, link, size(fsize)))
-        totalSize = totalSize + fsize
+        date = ep[1]
+        #print("%d: %s (size %s)" % (x, link, size(fsize)))
+        #totalSize = totalSize + fsize
+        fe = fg.add_entry()
+        fe.title("%d. Bolum" % x)
+        fe.published(date)
+        fe.link(link)
 
-print("\nAll episodes take up %s combined." % size(totalSize))
+print(fg.rss_str(pretty=True))
+#print("\nAll episodes take up %s combined." % size(totalSize))
