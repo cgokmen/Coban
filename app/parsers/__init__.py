@@ -1,0 +1,1 @@
+from KanalDParser import KanalDParser
