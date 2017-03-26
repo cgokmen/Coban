@@ -6,10 +6,8 @@ from twisted.python import log
 from twisted.web.resource import Resource, NoResource
 from twisted.web.server import Site
 from twisted.web.util import redirectTo
-import tasks
 
-from app.parsers.KanalDParser import KanalDParser
-from models import Series, Episode, ChannelEnum
+from cobanlib import tasks
 
 sqlPath = '/data/data.db'
 engine = create_engine("sqlite:///" + sqlPath, connect_args={'check_same_thread': False})

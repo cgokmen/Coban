@@ -1,9 +1,11 @@
-from parsers import KanalDParser
-from models import Series, Season, Episode, ChannelEnum
-from feedgen.feed import FeedGenerator
-import tvdb_api
 import datetime
+
+import tvdb_api
 from dateutil.parser import parse
+from feedgen.feed import FeedGenerator
+
+from cobanlib.parsers import KanalDParser
+from models import Series, Episode, ChannelEnum
 
 MAX_GAP = datetime.timedelta(days=60) # Two months of no new episodes mean new season
 
